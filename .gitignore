@@ -1,0 +1,6 @@
+*.ipynb_checkpoints
+*__pycache__
+/app/siamese_network/data/omniglot/images_background/*
+/app/siamese_network/data/omniglot/images_evaluation/*
+/app/face_recog/models/model_weights/face_recog/*
+/app/siamese_network/57364_110433_bundle_archive.zip
