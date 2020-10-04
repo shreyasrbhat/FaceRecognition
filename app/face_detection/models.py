@@ -174,16 +174,51 @@ class YOLOLayer(nn.Module):
         
         output = torch.cat((pred_boxes, pred_conf), -1)
 
-#         output = torch.cat(
-#             (
-#                 pred_boxes.view(num_samples, -1, 4) * self.stride,
-#                 pred_conf.view(num_samples, -1, 1),
-#                 #pred_cls.view(num_samples, -1, self.num_classes),
-#             ),
-#             -1,
-#         )
+        output = torch.cat(
+            (
+                pred_boxes.view(num_samples, -1, 4) * self.stride,
+                pred_conf.view(num_samples, -1, 1),
+                pred_cls.view(num_samples, -1, self.num_classes),
+            ),
+            -1,
+        )
+        if targets is None:
+            return output, 0
+        
+        else:
+            iou_scores, obj_mask, noobj_mask, tx, ty, tw, th, tconf = \
+            build_targets(pred_boxes, targets, self.scaled_anchors, self.ignore_thres)
+        
+            ## losses
+            loss_x = self.mse_loss(x[obj_mask], tx[obj_mask])
+            loss_y = self.mse_loss(y[obj_mask], ty[obj_mask])
+
+            loss_w = self.mse_loss(w[obj_mask], tw[obj_mask])
+            loss_h = self.mse_loss(h[obj_mask], th[obj_mask])
+
+            obj_loss = self.bce_loss(pred_conf[obj_mask], tconf[obj_mask])
+            noobj_loss = self.bce_loss(pred_conf[noobj_mask], tconf[noobj_mask])
+
+            conf_loss = self.obj_scale * obj_loss + self.noobj_scale * noobj_loss
+            total_loss = loss_x + loss_y + loss_w + loss_h + conf_loss
+        
+        # Metrics
+            conf_obj = pred_conf[obj_mask].mean()
+            conf_noobj = pred_conf[noobj_mask].mean()
+
+            self.metrics = {
+                "loss": to_cpu(total_loss).item(),
+                "x": to_cpu(loss_x).item(),
+                "y": to_cpu(loss_y).item(),
+                "w": to_cpu(loss_w).item(),
+                "h": to_cpu(loss_h).item(),
+                "conf": to_cpu(conf_loss).item(),
+                "conf_obj": to_cpu(conf_obj).item(),
+                "conf_noobj": to_cpu(conf_noobj).item(),
+                "grid_size": grid_size,
+            }
             
-        return output
+        return output, total_loss
 
 
 class Darknet(nn.Module):
