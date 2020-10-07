@@ -1,39 +1,39 @@
 train:
-    model:
-      model_def: 'yolov3.cfg'
-      pretrained_weights: 
-      checkpoint: None
-    
-    data:
-      img_path: 'data/train_images'
-      train_labels: 'data/labels.txt'
-      valid_labels: None
-      class_names: None
-  
-    params:
-      img_size: 416
-      epochs: 1
-      batch_size: 2
-      gradient_accumulations: 2
-      n_cpu: 8
-      checkpoint_interval: 9
-      evaluation_interval: 1
-      compute_map: False
-      multiscale_training: True
-  
-test:
   model:
-    model_def: 'config/yolov3-tiny.cfg'
-    weights_path: 'checkpoints3/yolov3-tiny_ckpt_99.pth'
-    
+    model_def: 'yolov3.cfg'
+    pretrained_weights: 
+    checkpoint: 
+  
   data:
-    samples: 'data/samples'
-    class_names: 'data/labels/classes.names'
+    train_img_path: 'data/train_images'
+    train_labels: 'data/labels.txt'
+    val_img_path: 
+    val_labels: 
 
   params:
     img_size: 416
-    batch_size: 8
-    iou_thres: 0.5
-    conf_thres: 0.2
-    nms_thres: 0.01
-    n_cpu: 2
+    epochs: 1
+    batch_size: 2
+    gradient_accumulations: 2
+    n_cpu: 8
+    checkpoint_interval: 9
+    evaluation_interval: 1
+    compute_map: False
+    multiscale_training: True
+
+test:
+model:
+  model_def: 'config/yolov3-tiny.cfg'
+  weights_path: 'checkpoints3/yolov3-tiny_ckpt_99.pth'
+  
+data:
+  samples: 'data/samples'
+  class_names: 'data/labels/classes.names'
+
+params:
+  img_size: 416
+  batch_size: 8
+  iou_thres: 0.5
+  conf_thres: 0.2
+  nms_thres: 0.01
+  n_cpu: 2

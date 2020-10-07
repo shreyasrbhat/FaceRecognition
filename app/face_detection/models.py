@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 from parse_config import parse_model_config
+from utils import build_targets
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -149,7 +150,6 @@ class YOLOLayer(nn.Module):
             .permute(0, 1, 3, 4, 2)
             .contiguous()
         )
-        print(prediction.shape)
 
         # Get outputs
         x = torch.sigmoid(prediction[..., 0])  # Center x
@@ -157,7 +157,6 @@ class YOLOLayer(nn.Module):
         w = prediction[..., 2]  # Width
         h = prediction[..., 3]  # Height
         pred_conf = torch.sigmoid(prediction[..., 4])  # Conf
-        #pred_cls = torch.sigmoid(prediction[..., 5:])  # Cls pred.
 
         # If grid size does not match current we compute new offsets
         if grid_size != self.grid_size:
@@ -170,7 +169,6 @@ class YOLOLayer(nn.Module):
         pred_boxes[..., 2] = torch.exp(w.data) * self.anchor_w
         pred_boxes[..., 3] = torch.exp(h.data) * self.anchor_h
         pred_conf = pred_conf.unsqueeze(-1)
-        print(pred_boxes.shape, pred_conf.shape)
         
         output = torch.cat((pred_boxes, pred_conf), -1)
 
@@ -178,7 +176,6 @@ class YOLOLayer(nn.Module):
             (
                 pred_boxes.view(num_samples, -1, 4) * self.stride,
                 pred_conf.view(num_samples, -1, 1),
-                pred_cls.view(num_samples, -1, self.num_classes),
             ),
             -1,
         )
@@ -195,9 +192,9 @@ class YOLOLayer(nn.Module):
 
             loss_w = self.mse_loss(w[obj_mask], tw[obj_mask])
             loss_h = self.mse_loss(h[obj_mask], th[obj_mask])
-
-            obj_loss = self.bce_loss(pred_conf[obj_mask], tconf[obj_mask])
-            noobj_loss = self.bce_loss(pred_conf[noobj_mask], tconf[noobj_mask])
+      
+            obj_loss = self.bce_loss(pred_conf[obj_mask], tconf[obj_mask].reshape(-1,1))
+            noobj_loss = self.bce_loss(pred_conf[noobj_mask], tconf[noobj_mask].reshape(-1,1))
 
             conf_loss = self.obj_scale * obj_loss + self.noobj_scale * noobj_loss
             total_loss = loss_x + loss_y + loss_w + loss_h + conf_loss
@@ -235,7 +232,7 @@ class Darknet(nn.Module):
 
     def forward(self, x, targets=None):
         img_dim = x.shape[2]
-        #loss = 0
+        loss = 0
         layer_outputs, yolo_outputs = [], []
         for i, (module_def, module) in enumerate(zip(self.module_defs, self.module_list)):
             if module_def["type"] in ["convolutional", "upsample", "maxpool"]:
@@ -246,11 +243,12 @@ class Darknet(nn.Module):
                 layer_i = int(module_def["from"])
                 x = layer_outputs[-1] + layer_outputs[layer_i]
             elif module_def["type"] == "yolo":
-                x = module[0](x, targets, img_dim)
+                x, layer_loss = module[0](x, targets, img_dim)
+                loss+=layer_loss
                 yolo_outputs.append(x)
             layer_outputs.append(x)
         yolo_outputs = to_cpu(torch.cat(yolo_outputs, 1))
-        return yolo_outputs
+        return yolo_outputs if targets is None else (loss, yolo_outputs)
 
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""

@@ -4,7 +4,7 @@ from models import *
 from utils import *
 from data_manager import *
 from parse_config import *
-#from test import evaluate
+from test import evaluate, log_metrics
 
 from terminaltables import AsciiTable
 
@@ -94,7 +94,7 @@ for epoch in range(train_params["epochs"]):
         loss.backward()
 
         if batches_done % train_params["gradient_accumulations"]:
-            # Accumulates gradient before each step
+            # Accumulates gradiejeent before each step
             optimizer.step()
             optimizer.zero_grad()
 
@@ -102,16 +102,18 @@ for epoch in range(train_params["epochs"]):
         #   Log progress
         # ----------------
 
-            log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, train_params["epochs"], batch_i, len(dataloader))
+            # log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, train_params["epochs"], batch_i, len(dataloader))
 
-            metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
+            # metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
 
-            # Log metrics at each YOLO layer
-            for i, metric in enumerate(metrics):
-                formats = {m: "%.6f" for m in metrics}
-                formats["grid_size"] = "%2d"
-                row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.yolo_layers]
-                metric_table += [[metric, *row_metrics]]
+            # # Log metrics at each YOLO layer
+            # for i, metric in enumerate(metrics):
+            #     formats = {m: "%.6f" for m in metrics}
+            #     formats["grid_size"] = "%2d"
+            #     row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.yolo_layers]
+            #     metric_table += [[metric, *row_metrics]]
+
+            log_str = log_metrics(model, loss, len(dataloader), train=True, batch_i, epoch)
 
                 # Tensorboard logging
                 tensorboard_log = []
