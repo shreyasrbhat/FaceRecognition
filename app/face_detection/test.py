@@ -1,7 +1,13 @@
 
 from data_manager import FaceTrainSet
+import torch
 from torch.utils.data import DataLoader
+from torch.autograd import Variable
 from utils import x1y1x2y2, non_max_suppression
+import tqdm
+import argparse
+import yaml
+from terminaltables import AsciiTable
 
 
 parser = argparse.ArgumentParser()
@@ -15,30 +21,41 @@ try:
 except Exception as e:
     print("unable to read config file")
 
-
-def evaluate(model, img_path, iou_thres, conf_thres, nms_thres, img_size, batch_size):
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def evaluate(model, img_path, labels_path, iou_thres, conf_thres, nms_thres, img_size, batch_size):
     model.eval()
     labels = []
-    sample_metrics = []
-    dataset = FaceTrainSet(path, labels_path, transforms = None)
+    metrics = [
+    "grid_size",
+    "loss",
+    "x",
+    "y",
+    "w",
+    "h",
+    "conf",
+    "conf_obj",
+    "conf_noobj",
+    ]
+    dataset = FaceTrainSet(img_path, labels_path, transforms = None)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=dataset.collate_fn)
     
     Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 
     for batch_i, (imgs, targets, num_objs) in enumerate(tqdm.tqdm(dataloader, desc="Detecting objects")):
-        targets = x1y1x2y2(targets)
         with torch.no_grad():
+            imgs = Variable(imgs.to(device))
+            targets = Variable(targets.to(device), requires_grad=False)
             predictions, loss = model(imgs, targets)
             if batch_i == len(dataloader)-1:
-                log_str = log_metrics(model, loss, len(dataloader), train=False)
+                log_str = log_metrics(model, loss, metrics, len(dataloader), train=False)
                 print(log_str)
             #outputs = non_max_suppression(predictions, conf_thres, nms_thres)
         
         #sample_metrics += get_batch_statistics(outputs, targets, iou_threshold=iou_thres)
 
-def log_metrics(model, loss, len_dataloader, train=False, batch_i=None, epoch=None):
+def log_metrics(model, loss, metrics, len_dataloader, train=False, batch_i=None, epoch=None):
     metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
-    if train=True:
+    if train:
         log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, config['train']['params']["epochs"], batch_i, len(dataloader))
     else:
         log_str = "\n--- Validation Metrics ---"
